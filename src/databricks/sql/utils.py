@@ -553,9 +553,12 @@ class ParamEscaper:
         return "'{}'".format(item.replace("\\", "\\\\").replace("'", "\\'"))
 
     def escape_sequence(self, item):
-        l = map(self.escape_item, item)
-        l = list(map(str, l))
-        return "ARRAY(" + ",".join(l) + ")"
+        l = list(map(str, map(self.escape_item, item)))
+        return "(" + ",".join(l) + ")"
+    
+    def escape_array(self, item):
+        l = list(map(str, map(self.escape_item, item)))
+        return "ARRAY[" + ",".join(l) + "]"
 
     def escape_mapping(self, item):
         l = map(
@@ -576,6 +579,14 @@ class ParamEscaper:
     def escape_item(self, item):
         if item is None:
             return "NULL"
+
+        # IMPORTANT: sequences should never reach here anymore
+        if isinstance(item, (list, tuple)):
+            raise TypeError(
+                "escape_item() received a sequence; "
+                "sequence handling must be explicit"
+            )
+
         elif isinstance(item, (int, float)):
             return self.escape_number(item)
         elif isinstance(item, str):
@@ -586,8 +597,6 @@ class ParamEscaper:
             return self.escape_datetime(item, self._DATE_FORMAT)
         elif isinstance(item, decimal.Decimal):
             return self.escape_decimal(item)
-        elif isinstance(item, Sequence):
-            return self.escape_sequence(item)
         elif isinstance(item, Mapping):
             return self.escape_mapping(item)
         else:
@@ -926,3 +935,16 @@ def build_client_context(server_hostname: str, version: str, **kwargs):
             "_telemetry_circuit_breaker_enabled"
         ),
     )
+
+
+def param_used_in_in_clause(sql: str, param_name: str) -> bool:
+    pattern = re.compile(
+        rf"""
+        \bIN\s*
+        \(?\s*
+        :{re.escape(param_name)}\b
+        \s*\)?
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    return bool(pattern.search(sql))

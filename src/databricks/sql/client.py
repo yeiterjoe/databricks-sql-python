@@ -35,6 +35,7 @@ from databricks.sql.utils import (
     ColumnTable,
     ColumnQueue,
     build_client_context,
+    param_used_in_in_clause
 )
 from databricks.sql.parameters.native import (
     DbsqlParameterBase,
@@ -91,6 +92,8 @@ NO_NATIVE_PARAMS: List = []
 
 # Transaction isolation level constants (extension to PEP 249)
 TRANSACTION_ISOLATION_LEVEL_REPEATABLE_READ = "REPEATABLE_READ"
+
+_IN_PARAM_CACHE = {}
 
 
 class Connection:
@@ -966,9 +969,21 @@ class Cursor:
                 The list is always empty because native parameters are never used under the inline approach
         """
 
-        escaped_values = self.escaper.escape_args(params)
-        rendered_statement = inject_parameters(stmt, escaped_values)
+        if params is None:
+            return stmt, NO_NATIVE_PARAMS
 
+        escaped_values = {}
+
+        for name, value in params.items():
+            if isinstance(value, (list, tuple)):
+                if param_used_in_in_clause(stmt, name):
+                    escaped_values[name] = self.escaper.escape_sequence_in_list(value)
+                else:
+                    escaped_values[name] = self.escaper.escape_sequence_array(value)
+            else:
+                escaped_values[name] = self.escaper.escape_item(value)
+
+        rendered_statement = inject_parameters(stmt, escaped_values)
         return rendered_statement, NO_NATIVE_PARAMS
 
     def _prepare_native_parameters(
