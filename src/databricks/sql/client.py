@@ -93,8 +93,6 @@ NO_NATIVE_PARAMS: List = []
 # Transaction isolation level constants (extension to PEP 249)
 TRANSACTION_ISOLATION_LEVEL_REPEATABLE_READ = "REPEATABLE_READ"
 
-_IN_PARAM_CACHE = {}
-
 
 class Connection:
     def __init__(

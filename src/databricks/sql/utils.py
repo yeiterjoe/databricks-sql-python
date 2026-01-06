@@ -558,7 +558,7 @@ class ParamEscaper:
     
     def escape_array(self, item):
         l = list(map(str, map(self.escape_item, item)))
-        return "ARRAY[" + ",".join(l) + "]"
+        return "ARRAY(" + ",".join(l) + ")"
 
     def escape_mapping(self, item):
         l = map(
