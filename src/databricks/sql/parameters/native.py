@@ -537,6 +537,51 @@ class MapParameter(DbsqlParameterBase):
     CAST_EXPR = DatabricksSupportedType.MAP.name
 
 
+class InListParameter(DbsqlParameterBase):
+    """Wrap a Python `Sequence` that will be bound for SQL IN clauses."""
+
+    def __init__(self, value: Sequence[Any], name: Optional[str] = None):
+        """
+        :value:
+            The value to bind for this parameter. This will be used in IN clauses.
+        :name:
+            If None, your query must contain a `?` marker. Like:
+
+            ```sql
+               SELECT * FROM table WHERE field IN ?
+            ```
+            If not None, your query should contain a named parameter marker. Like:
+            ```sql
+                SELECT * FROM table WHERE field IN :my_param
+            ```
+
+            The `name` argument to this function would be `my_param`.
+        """
+        self.name = name
+        self.value = [dbsql_parameter_from_primitive(val) for val in value]
+
+    def as_tspark_param(self, named: bool = False) -> TSparkParameter:
+        """Returns a TSparkParameter object that can be passed to the DBR thrift server."""
+
+        tsp = TSparkParameter(type=self._cast_expr())
+        tsp.arguments = [val._tspark_value_arg() for val in self.value]
+
+        if named:
+            tsp.name = self.name
+            tsp.ordinal = False
+        elif not named:
+            tsp.ordinal = True
+        return tsp
+
+    def _tspark_value_arg(self):
+        """Returns a TSparkParameterValueArg object that can be passed to the DBR thrift server."""
+        tva = TSparkParameterValueArg(type=self._cast_expr())
+        tva.arguments = [val._tspark_value_arg() for val in self.value]
+        return tva
+
+    CAST_EXPR = DatabricksSupportedType.ARRAY.name
+
+
 class DecimalParameter(DbsqlParameterBase):
     """Wrap a Python `Decimal` that will be bound to a Databricks SQL DECIMAL type."""
 
@@ -695,6 +740,7 @@ TDbsqlParameter = Union[
     DecimalParameter,
     ArrayParameter,
     MapParameter,
+    InListParameter,
 ]
 
 
@@ -717,4 +763,7 @@ _all__ = [
     "TimestampNTZParameter",
     "TinyIntParameter",
     "DecimalParameter",
+    "ArrayParameter",
+    "MapParameter",
+    "InListParameter",
 ]

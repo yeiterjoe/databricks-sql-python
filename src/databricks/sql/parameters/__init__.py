@@ -14,4 +14,5 @@ from databricks.sql.parameters.native import (
     DecimalParameter,
     MapParameter,
     ArrayParameter,
+    InListParameter,
 )

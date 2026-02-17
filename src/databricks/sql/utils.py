@@ -28,7 +28,11 @@ from databricks.sql.thrift_api.TCLIService.ttypes import (
 from databricks.sql.types import SSLOptions
 from databricks.sql.backend.types import CommandId
 from databricks.sql.telemetry.models.event import StatementType
-from databricks.sql.parameters.native import ParameterStructure, TDbsqlParameter
+from databricks.sql.parameters.native import (
+    ParameterStructure,
+    TDbsqlParameter,
+    InListParameter,
+)
 
 import logging
 
@@ -565,6 +569,12 @@ class ParamEscaper:
         l = list(map(str, l))
         return "MAP(" + ",".join(l) + ")"
 
+    def escape_inlist(self, item):
+        """Escape sequence for IN clause usage - renders as (val1,val2,...)"""
+        l = map(self.escape_item, item)
+        l = list(map(str, l))
+        return "(" + ",".join(l) + ")"
+
     def escape_datetime(self, item, format, cutoff=0):
         dt_str = item.strftime(format)
         formatted = dt_str[:-cutoff] if cutoff and format.endswith(".%f") else dt_str
@@ -576,6 +586,8 @@ class ParamEscaper:
     def escape_item(self, item):
         if item is None:
             return "NULL"
+        elif isinstance(item, InListParameter):
+            return self.escape_inlist(item.value)
         elif isinstance(item, (int, float)):
             return self.escape_number(item)
         elif isinstance(item, str):
